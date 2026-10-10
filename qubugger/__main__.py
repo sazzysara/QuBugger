@@ -1,8 +1,18 @@
 """Run the full QuBugger demo:  python -m qubugger"""
-from . import *
+import sys
 import warnings; warnings.filterwarnings("ignore")
+from . import *
 
 def main():
+    if len(sys.argv) > 1 and ("--web" in sys.argv or "web" in sys.argv or "-w" in sys.argv):
+        from .server import start_server
+        port = 8080
+        for arg in sys.argv[1:]:
+            if arg.isdigit():
+                port = int(arg)
+        start_server(port=port)
+        return
+
     print("=== 1. Correct circuits (ideal vs noisy) ===")
     for name, c in CIRCUITS.items():
         ci, mi = passes(c["n"], c["gates"], c["expected"])

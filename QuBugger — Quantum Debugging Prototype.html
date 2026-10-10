@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>QuBugger — Quantum Debugging &amp; Testing Prototype</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f3f0e8;--panel:#fbf9f4;--ink:#1b1d1a;--mute:#6b6f66;--line:#d9d4c6;--ok:#0b6e4f;--bad:#b3261e;--acc:#2b4fd8;--warn:#9a6700;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0d1310;--panel:#141c17;--ink:#d9e8de;--mute:#85968b;--line:#26332b;--ok:#5ef2a7;--bad:#ff6b5e;--acc:#7da2ff;--warn:#f2c14e}}
+:root[data-theme="dark"]{--bg:#0d1310;--panel:#141c17;--ink:#d9e8de;--mute:#85968b;--line:#26332b;--ok:#5ef2a7;--bad:#ff6b5e;--acc:#7da2ff;--warn:#f2c14e}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 "IBM Plex Mono",ui-monospace,Menlo,monospace}
+h1,h2{font-family:Fraunces,Georgia,serif;margin:0}
+header{padding:28px 20px 8px;max-width:1100px;margin:auto}
+h1{font-size:clamp(34px,6vw,60px);font-weight:800;letter-spacing:-.02em}
+h1 span{color:var(--bad)}
+.sub{color:var(--mute);max-width:70ch;margin:6px 0 0}
+.tag{display:inline-block;border:1px solid var(--line);padding:2px 8px;font-size:11px;color:var(--mute);margin:10px 6px 0 0}
+main{max-width:1100px;margin:auto;padding:12px 20px 40px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:16px}
+@media(max-width:820px){main{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);padding:16px}
+.card h2{font-size:20px;margin-bottom:10px}
+label{font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:.08em}
+select,textarea,button{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);padding:7px 10px}
+textarea{width:100%;height:130px;resize:vertical}
+button{cursor:pointer}button:hover{border-color:var(--acc)}
+button.run{background:var(--ink);color:var(--bg);font-weight:600;width:100%;margin-top:10px;padding:10px}
+.row{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.svgw{overflow-x:auto;border:1px solid var(--line);background:var(--bg);margin-top:10px}
+.verdict{display:flex;justify-content:space-between;gap:8px;border-left:4px solid var(--line);padding:8px 10px;margin:8px 0;background:var(--bg)}
+.pass{border-color:var(--ok)}.fail{border-color:var(--bad)}.pass b{color:var(--ok)}.fail b{color:var(--bad)}
+.bars{margin:6px 0 12px}.bar{display:grid;grid-template-columns:34px 1fr 52px;gap:8px;align-items:center;font-size:12px}
+.track{height:12px;background:var(--bg);border:1px solid var(--line);position:relative}
+.fill{height:100%;background:var(--acc)}.fill.imp{background:var(--bad)}
+.exp{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink)}
+.small{font-size:12px;color:var(--mute)}
+ul{margin:4px 0;padding-left:18px}li{margin:3px 0}
+.chip{display:inline-block;border:1px solid var(--line);padding:1px 7px;margin:2px 4px 2px 0;font-size:12px}
+.steps{max-width:1100px;margin:0 auto;padding:0 20px 40px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.steps div{border-top:2px solid var(--ink);padding-top:8px}.steps b{font-family:Fraunces,serif;font-size:16px}
+footer{max-width:1100px;margin:auto;padding:0 20px 40px;color:var(--mute);font-size:12px}
+</style></head><body>
+<header>
+<h1>Qu<span>Bugger</span></h1>
+<p class="sub">Automated debugging &amp; testing for quantum programs. Bugs in quantum code are silent: the circuit runs, the output looks plausible, and it is wrong. QuBugger tests behaviour from measured output distributions and points at the suspect gate.</p>
+<span class="tag">Team InnoVentors</span><span class="tag">Lead: Sanjana R</span><span class="tag">QHack India 2026 · Quantum AI with Software</span>
+</header>
+<main>
+<section class="card">
+<h2>1 · Program under test</h2>
+<label>Circuit (reference defines expected behaviour)</label>
+<div class="row"><select id="sel"><option value="bell">Bell (2 qubits)</option><option value="ghz">GHZ-3 (3 qubits)</option><option value="grover">Grover-2 (2 qubits)</option></select>
+<button id="reset">Reset to correct</button><button id="rm">Inject bug: drop a gate</button><button id="sw">Inject bug: CX→CZ</button></div>
+<textarea id="code" spellcheck="false"></textarea>
+<small class="small">Gates: h q · x q · z q · cx c t · cz c t. Edit freely — qubit 0 is the rightmost bit.</small>
+<div class="svgw" id="draw"></div>
+<button class="run" id="run">▶ Run QuBugger (4096 shots, ideal + noisy)</button>
+<p class="small">Noise: depolarizing-style Pauli errors, 0.2% per 1-qubit gate, 1% per 2-qubit gate. Simulator runs in your browser; fixed seed.</p>
+</section>
+<section class="card" id="out"><h2>2 · Report</h2><p class="small">Running…</p></section>
+</main>
+<div class="steps">
+<div><b>Assertion testing</b><br>Chi-square on measured counts vs expected distribution; shots on impossible outcomes fail the test.</div>
+<div><b>Bug-pattern scan</b><br>Linter-style checks, e.g. no entangling gate in a multi-qubit circuit.</div>
+<div><b>Mutation testing</b><br>Inject deliberate bugs into the correct circuit; score how many the test catches.</div>
+<div><b>Fault localization</b><br>Search single-gate repairs that make the test pass to point at the faulty position.</div>
+</div>
+<footer>Scope: browser-side statevector simulator on 2–3 qubit circuits; classical software, no quantum-advantage claim. Not yet run on IBM Quantum hardware or Bugs4Q. Planned: Cirq/OpenQASM input, ML-ranked gate suspiciousness, pytest plugin. The Qiskit/Aer reference prototype is the team's Python implementation; this page re-implements its logic for demonstration.</footer>
+<script>
+const $=s=>document.querySelector(s);
+const REF={bell:{n:2,c:"h 0\ncx 0 1"},ghz:{n:3,c:"h 0\ncx 0 1\ncx 1 2"},grover:{n:2,c:"h 0\nh 1\ncz 0 1\nh 0\nh 1\nx 0\nx 1\ncz 0 1\nx 0\nx 1\nh 0\nh 1"}};
+const SH=4096,P1=.002,P2=.01,S=Math.SQRT1_2;
+const rng=s=>()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
+function ap(re,g){const[k,a,b]=g,N=re.length;
+ if(k.length==1){const m=1<<a;for(let i=0;i<N;i++)if(!(i&m)){const j=i|m,u=re[i],v=re[j];
+  if(k=='h'){re[i]=(u+v)*S;re[j]=(u-v)*S}else if(k=='x'){re[i]=v;re[j]=u}else re[j]=-v}}
+ else{const c=1<<a,t=1<<b;for(let i=0;i<N;i++)if(i&c){if(k=='cx'){if(!(i&t)){const j=i|t,u=re[i];re[i]=re[j];re[j]=u}}else if(i&t)re[i]=-re[i]}}}
+function probs(circ,n){const re=new Float64Array(1<<n);re[0]=1;circ.forEach(g=>ap(re,g));return Array.from(re,v=>v*v)}
+function draw(p,r){let x=r(),s=0;for(let i=0;i<p.length;i++){s+=p[i];if(x<s)return i}return p.length-1}
+function ideal(circ,n,seed){const p=probs(circ,n),r=rng(seed),c=new Array(1<<n).fill(0);for(let i=0;i<SH;i++)c[draw(p,r)]++;return c}
+function noisy(circ,n,seed){const r=rng(seed),c=new Array(1<<n).fill(0);
+ for(let s=0;s<SH;s++){const re=new Float64Array(1<<n);re[0]=1;
+  for(const g of circ){ap(re,g);const two=g[0].length==2;
+   if(r()<(two?P2:P1)){const q=two&&r()<.5?g[2]:g[1],e=r();if(e<.5||e>=.75)ap(re,['x',q]);if(e>=.5)ap(re,['z',q])}}
+  c[draw(re.map(v=>v*v),r)]++}return c}
+function lg(z){let s=0;while(z<8){s-=Math.log(z);z++}return s+(z-.5)*Math.log(z)-z+.9189385+1/(12*z)}
+function chiP(df,x){if(df<1)return 1;if(x<=0)return 1;if(x>150)return 0;const a=df/2,h=x/2;let sum=1/a,t=sum;
+ for(let n=1;n<400;n++){t*=h/(a+n);sum+=t;if(t<1e-13*sum)break}return Math.max(0,1-Math.exp(-h+a*Math.log(h)-lg(a))*sum)}
+function test(c,exp){let imp=0,k=0,chi=0;const tot=c.reduce((a,b)=>a+b,0);
+ c.forEach((o,i)=>{if(exp[i]<1e-9)imp+=o;else k++});const m=tot-imp;
+ c.forEach((o,i)=>{if(exp[i]>=1e-9){const E=exp[i]*m;chi+=(o-E)**2/E}});
+ const p=chiP(k-1,chi),f=imp/tot;return{pass:f<.05&&p>.001,f,p}}
+function parse(t,n){const c=[];for(const l of t.split('\n')){const w=l.trim().toLowerCase().split(/[\s,]+/);if(!w[0]||w[0][0]=='#')continue;
+ const k=w[0],a=+w[1],b=w[2]===undefined?undefined:+w[2];
+ if(!['h','x','z','cx','cz'].includes(k))throw'Unknown gate "'+k+'"';
+ if(!(a>=0&&a<n))throw'Bad qubit in "'+l.trim()+'"';
+ if(k.length==2&&!(b>=0&&b<n&&b!=a))throw'Bad second qubit in "'+l.trim()+'"';
+ c.push(k.length==2?[k,a,b]:[k,a])}return c}
+const g2s=g=>g[0]+'('+g.slice(1).join(',')+')';
+function scan(c,n,exp){const w=[],used=new Set();c.forEach(g=>g.slice(1).forEach(q=>used.add(q)));
+ const multi=exp.filter(p=>p>1e-9).length>1;
+ if(n>1&&!c.some(g=>g.length==3))w.push('No two-qubit gate found — cannot create entanglement.');
+ for(let q=0;q<n;q++)if(!used.has(q))w.push('Qubit '+q+' is never touched by any gate.');
+ if(multi&&!c.some(g=>g[0]=='h'))w.push('No Hadamard: nothing creates superposition.');
+ for(let i=1;i<c.length;i++)if(c[i].join()==c[i-1].join())w.push('Adjacent identical gates '+g2s(c[i])+' at '+(i-1)+'–'+i+' cancel out (redundant).');
+ return w}
+function ok(c,n,exp){return test(ideal(c,n,7),exp).pass}
+function gates(n){const o=[];for(let q=0;q<n;q++)['h','x','z'].forEach(k=>o.push([k,q]));
+ for(let a=0;a<n;a++)for(let b=0;b<n;b++)if(a!=b)['cx','cz'].forEach(k=>o.push([k,a,b]));return o}
+function repairs(c,n,exp){const out=[],G=gates(n);
+ for(let i=0;i<=c.length;i++)for(const g of G){const d=[...c.slice(0,i),g,...c.slice(i)];if(ok(d,n,exp))out.push('insert '+g2s(g)+' at position '+i)}
+ for(let i=0;i<c.length;i++){const d=c.filter((_,j)=>j!=i);if(ok(d,n,exp))out.push('delete '+g2s(c[i])+' at position '+i);
+  for(const g of G){if(g.join()==c[i].join())continue;const e=[...c];e[i]=g;if(ok(e,n,exp))out.push('replace '+g2s(c[i])+' with '+g2s(g)+' at position '+i)}}
+ return out}
+function mutants(c,n){const m=[],G=gates(n);
+ c.forEach((g,i)=>{m.push(c.filter((_,j)=>j!=i));
+  const sw={h:['x','z'],x:['z','h'],z:['x','h'],cx:['cz'],cz:['cx']}[g[0]];
+  sw.forEach(k=>{const e=[...c];e[i]=[k,...g.slice(1)];m.push(e)});
+  if(g[0]=='cx'){const e=[...c];e[i]=['cx',g[2],g[1]];m.push(e)}});return m}
+function svg(c,n){const W=60+c.length*46,H=30+n*40;let s=`<svg width="${W}" height="${H}" font-family="IBM Plex Mono,monospace" font-size="12" style="display:block">`;
+ const y=q=>20+(n-1-q)*40;
+ for(let q=0;q<n;q++)s+=`<text x="8" y="${y(q)+4}" fill="var(--mute)">q${q}</text><line x1="36" x2="${W-6}" y1="${y(q)}" y2="${y(q)}" stroke="var(--line)" stroke-width="1.5"/>`;
+ c.forEach((g,i)=>{const x=60+i*46;
+  if(g.length==2)s+=`<rect x="${x-14}" y="${y(g[1])-14}" width="28" height="28" fill="var(--panel)" stroke="var(--ink)"/><text x="${x}" y="${y(g[1])+4}" text-anchor="middle" fill="var(--ink)">${g[0].toUpperCase()}</text>`;
+  else{s+=`<line x1="${x}" x2="${x}" y1="${y(g[1])}" y2="${y(g[2])}" stroke="var(--ink)" stroke-width="1.5"/><circle cx="${x}" cy="${y(g[1])}" r="4" fill="var(--ink)"/>`;
+   s+=g[0]=='cx'?`<circle cx="${x}" cy="${y(g[2])}" r="11" fill="var(--panel)" stroke="var(--ink)"/><text x="${x}" y="${y(g[2])+5}" text-anchor="middle" fill="var(--ink)">+</text>`:`<circle cx="${x}" cy="${y(g[2])}" r="4" fill="var(--ink)"/>`}
+  s+=`<text x="${x}" y="${H-4}" text-anchor="middle" fill="var(--mute)" font-size="10">${i}</text>`});return s+'</svg>'}
+function bars(cnt,exp,n){const tot=SH;return '<div class="bars">'+cnt.map((o,i)=>{const lab=i.toString(2).padStart(n,'0'),imp=exp[i]<1e-9;
+ return `<div class="bar"><span>${lab}</span><div class="track"><div class="fill ${imp&&o?'imp':''}" style="width:${o/tot*100}%"></div><div class="exp" style="left:${exp[i]*100}%"></div></div><span>${(o/tot*100).toFixed(1)}%</span></div>`}).join('')+'</div>'}
+const verdict=(name,t)=>`<div class="verdict ${t.pass?'pass':'fail'}"><span>${name}</span><span><b>${t.pass?'PASS':'FAIL'}</b> · ${(t.f*100).toFixed(1)}% impossible · χ² p=${t.p<.001?'<0.001':t.p.toFixed(3)}</span></div>`;
+let key='bell',bugN=0;
+function load(k){key=k;$('#code').value=REF[k].c;bugN=0;$('#draw').innerHTML=svg(parse(REF[k].c,REF[k].n),REF[k].n);run()}
+function run(){const o=$('#out'),{n,c:rc}=REF[key],ref=parse(rc,n),exp=probs(ref,n);let c;
+ try{c=parse($('#code').value,n)}catch(e){o.innerHTML='<h2>2 · Report</h2><div class="verdict fail"><b>Syntax error</b><span>'+e+'</span></div>';return}
+ $('#draw').innerHTML=svg(c,n);
+ const ci=ideal(c,n,42),cn=noisy(c,n,43),ti=test(ci,exp),tn=test(cn,exp),w=scan(c,n,exp);
+ let h='<h2>2 · Report</h2><label>Expected distribution (tick) vs measured, ideal run</label>'+bars(ci,exp,n);
+ h+='<label>Noisy run</label>'+bars(cn,exp,n)+'<label>Assertion tests</label>'+verdict('Ideal simulation',ti)+verdict('Noisy simulation',tn);
+ const verd=ti.pass&&tn.pass?'Both pass: no code bug detected.':!ti.pass&&!tn.pass?'Fails in ideal AND noisy runs → the code is buggy, not the hardware noise.':ti.pass?'Passes ideal but fails noisy → likely noise sensitivity, not a logic bug.':'Fails ideal but passes noisy → unusual; inspect expectation.';
+ h+=`<p><b>Diagnosis:</b> ${verd}</p><label>Bug-pattern scan</label>`+(w.length?'<ul>'+w.map(x=>'<li>⚠ '+x+'</li>').join('')+'</ul>':'<p class="small">No suspicious patterns found.</p>');
+ if(!ti.pass){const r=repairs(c,n,exp);h+='<label>Fault localization — single-gate repairs that fix the test ('+r.length+' found)</label>'+(r.length?'<ul>'+r.slice(0,6).map(x=>'<li>🔧 '+x+'</li>').join('')+'</ul>'+(r.length>6?'<p class="small">+ '+(r.length-6)+' more candidates (a short list, not a single answer).</p>':''):'<p class="small">No single-edit repair found — bug likely needs two edits.</p>')}
+ const ms=mutants(ref,n);let k=0;ms.forEach(m=>{if(!ok(m,n,exp))k++});
+ h+=`<label>Mutation testing of this test on the reference circuit</label><p><b>${k}/${ms.length}</b> injected bugs caught (score ${Math.round(k/ms.length*100)}%).${k<ms.length?' Survivors are mostly equivalent mutants that do not change the output distribution.':''}</p>`;
+ o.innerHTML=h}
+$('#sel').onchange=e=>load(e.target.value);$('#reset').onclick=()=>load(key);$('#run').onclick=run;
+$('#rm').onclick=()=>{const l=$('#code').value.split('\n').filter(x=>x.trim());if(l.length<2)return;l.splice((bugN++*2+1)%l.length,1);$('#code').value=l.join('\n');run()};
+$('#sw').onclick=()=>{const t=$('#code').value;$('#code').value=/cx/.test(t)?t.replace('cx','cz'):t;run()};
+load('bell');$('#rm').click();
+</script></body></html>

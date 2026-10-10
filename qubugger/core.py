@@ -22,8 +22,22 @@ def noise_model(p1=0.002, p2=0.01):
     nm.add_all_qubit_quantum_error(depolarizing_error(p2, 2), ["cx", "cz"])
     return nm
 
+_IDEAL_SIM = None
+_NOISY_SIM = None
+
+def get_simulator(noisy=False):
+    global _IDEAL_SIM, _NOISY_SIM
+    if noisy:
+        if _NOISY_SIM is None:
+            _NOISY_SIM = AerSimulator(noise_model=noise_model())
+        return _NOISY_SIM
+    else:
+        if _IDEAL_SIM is None:
+            _IDEAL_SIM = AerSimulator()
+        return _IDEAL_SIM
+
 def run(n, gates, noisy=False):
-    sim = AerSimulator(noise_model=noise_model()) if noisy else AerSimulator()
+    sim = get_simulator(noisy)
     qc = build(n, gates)
     res = sim.run(qc, shots=SHOTS, seed_simulator=SEED).result().get_counts()
     return {k.replace(" ", ""): v for k, v in res.items()}

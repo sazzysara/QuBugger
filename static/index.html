@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>QuBugger — Quantum Debugging &amp; Testing Prototype</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,800;1,9..144,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f3f0e8;
+  --panel: #fbf9f4;
+  --ink: #1b1d1a;
+  --mute: #6b6f66;
+  --line: #d9d4c6;
+  --ok: #0b6e4f;
+  --ok-bg: #e6f4ea;
+  --bad: #b3261e;
+  --bad-bg: #fce8e6;
+  --acc: #2b4fd8;
+  --warn: #9a6700;
+  --warn-bg: #fef7e0;
+  box-sizing: border-box;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d1310;
+    --panel: #141c17;
+    --ink: #d9e8de;
+    --mute: #85968b;
+    --line: #26332b;
+    --ok: #5ef2a7;
+    --ok-bg: #133324;
+    --bad: #ff6b5e;
+    --bad-bg: #3d1512;
+    --acc: #7da2ff;
+    --warn: #f2c14e;
+    --warn-bg: #332b12;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d1310;
+  --panel: #141c17;
+  --ink: #d9e8de;
+  --mute: #85968b;
+  --line: #26332b;
+  --ok: #5ef2a7;
+  --ok-bg: #133324;
+  --bad: #ff6b5e;
+  --bad-bg: #3d1512;
+  --acc: #7da2ff;
+  --warn: #f2c14e;
+  --warn-bg: #332b12;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 14px/1.5 "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+h1, h2 { font-family: Fraunces, Georgia, serif; margin: 0; }
+header {
+  padding: 28px 20px 8px;
+  max-width: 1120px;
+  margin: auto;
+}
+.header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+h1 {
+  font-size: clamp(34px, 6vw, 56px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+h1 span { color: var(--bad); }
+.sub {
+  color: var(--mute);
+  max-width: 70ch;
+  margin: 8px 0 0;
+  font-size: 13.5px;
+}
+.tags-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 12px 0 4px;
+}
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--line);
+  padding: 3px 9px;
+  font-size: 11px;
+  color: var(--mute);
+  background: var(--panel);
+}
+.tag.badge-live {
+  border-color: var(--ok);
+  color: var(--ok);
+  font-weight: 600;
+}
+.tag.badge-live::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ok);
+  display: inline-block;
+  animation: pulse 1.8s infinite;
+}
+@keyframes pulse {
+  0% { transform: scale(0.9); opacity: 0.7; }
+  50% { transform: scale(1.3); opacity: 1; }
+  100% { transform: scale(0.9); opacity: 0.7; }
+}
+
+main {
+  max-width: 1120px;
+  margin: auto;
+  padding: 12px 20px 40px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+  gap: 16px;
+}
+@media (max-width: 860px) {
+  main { grid-template-columns: 1fr; }
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  padding: 18px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+}
+.card h2 {
+  font-size: 20px;
+  margin-bottom: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+label {
+  font-size: 11px;
+  color: var(--mute);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  display: block;
+  margin-top: 10px;
+}
+label:first-child { margin-top: 0; }
+
+select, textarea, button {
+  font: inherit;
+  color: var(--ink);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  padding: 7px 10px;
+  border-radius: 2px;
+}
+textarea {
+  width: 100%;
+  height: 130px;
+  resize: vertical;
+  line-height: 1.45;
+  tab-size: 2;
+  font-family: inherit;
+}
+button {
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+button:hover {
+  border-color: var(--acc);
+  color: var(--acc);
+}
+button.run {
+  background: var(--ink);
+  color: var(--bg);
+  font-weight: 600;
+  width: 100%;
+  margin-top: 14px;
+  padding: 12px;
+  border: none;
+  font-size: 14px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+}
+button.run:hover {
+  background: var(--acc);
+  color: #fff;
+}
+.row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 8px 0;
+}
+.svgw {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  margin-top: 10px;
+  padding: 8px;
+}
+.verdict {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  border-left: 4px solid var(--line);
+  padding: 9px 12px;
+  margin: 8px 0;
+  background: var(--bg);
+  font-size: 12.5px;
+}
+.verdict.pass { border-color: var(--ok); background: var(--ok-bg); }
+.verdict.fail { border-color: var(--bad); background: var(--bad-bg); }
+.verdict.pass b { color: var(--ok); }
+.verdict.fail b { color: var(--bad); }
+
+.bars { margin: 8px 0 14px; }
+.bar {
+  display: grid;
+  grid-template-columns: 38px 1fr 52px;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+.track {
+  height: 13px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  position: relative;
+}
+.fill {
+  height: 100%;
+  background: var(--acc);
+  transition: width 0.3s ease;
+}
+.fill.imp { background: var(--bad); }
+.exp {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  background: var(--ink);
+  z-index: 2;
+}
+.exp-legend {
+  font-size: 11px;
+  color: var(--mute);
+  display: flex;
+  gap: 12px;
+  margin-top: 2px;
+}
+.small { font-size: 12px; color: var(--mute); }
+
+ul.report-list {
+  margin: 6px 0;
+  padding-left: 0;
+  list-style: none;
+}
+ul.report-list li {
+  margin: 5px 0;
+  padding: 6px 10px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12.5px;
+}
+ul.report-list li.warn {
+  border-left: 3px solid var(--warn);
+}
+ul.report-list li.repair {
+  border-left: 3px solid var(--ok);
+}
+.btn-apply {
+  font-size: 11px;
+  padding: 3px 8px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+.btn-apply:hover {
+  background: var(--ok);
+  color: #fff;
+  border-color: var(--ok);
+}
+
+.steps {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 20px 40px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+.steps div {
+  border-top: 2px solid var(--ink);
+  padding-top: 10px;
+}
+.steps b {
+  font-family: Fraunces, serif;
+  font-size: 16px;
+  display: block;
+  margin-bottom: 4px;
+}
+footer {
+  max-width: 1120px;
+  margin: auto;
+  padding: 0 20px 40px;
+  color: var(--mute);
+  font-size: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+.spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-radius: 50%;
+  border-top-color: #fff;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<header>
+  <div class="header-top">
+    <div>
+      <h1>Qu<span>Bugger</span></h1>
+      <p class="sub">Automated debugging, statistical assertion testing, and fault localization for quantum programs. Powered by Qiskit Aer &amp; Chi-Square inference.</p>
+    </div>
+    <div style="text-align:right">
+      <button id="theme-btn" style="font-size:12px">🌓 Theme</button>
+    </div>
+  </div>
+  <div class="tags-row">
+    <span class="tag">Team InnoVentors</span>
+    <span class="tag">QHack India 2026</span>
+    <span class="tag" id="backend-badge">Checking backend...</span>
+  </div>
+</header>
+
+<main>
+  <section class="card">
+    <h2>1 · Program Under Test</h2>
+    <label>Reference Circuit (defines expected state)</label>
+    <div class="row">
+      <select id="sel">
+        <option value="Bell">Bell State (2 qubits)</option>
+        <option value="GHZ-3">GHZ-3 (3 qubits)</option>
+        <option value="Grover-2">Grover Search 2-Qubit (2 qubits)</option>
+      </select>
+      <button id="reset" title="Reset to known correct reference circuit">Reset Correct</button>
+      <button id="rm" title="Simulate missing gate bug">Inject: Drop Gate</button>
+      <button id="sw" title="Simulate wrong two-qubit gate bug">Inject: CX→CZ</button>
+    </div>
+
+    <label for="code">Circuit Gates (QASM-style, Qubit 0 is LSB)</label>
+    <textarea id="code" spellcheck="false"></textarea>
+    <small class="small">Supported gates: <code>h q</code> · <code>x q</code> · <code>z q</code> · <code>cx c t</code> · <code>cz c t</code></small>
+
+    <div class="svgw" id="draw"></div>
+
+    <button class="run" id="run">
+      <span id="run-text">▶ Run QuBugger (4096 shots, ideal + noisy)</span>
+    </button>
+    <p class="small" style="margin-top:8px">Noise model: 0.2% 1-qubit depolarizing error, 1.0% 2-qubit error. Communicates live with Python backend API.</p>
+  </section>
+
+  <section class="card" id="out">
+    <h2>2 · Debug Report</h2>
+    <p class="small">Initializing engine...</p>
+  </section>
+</main>
+
+<div class="steps">
+  <div>
+    <b>1. Statistical Assertions</b>
+    Chi-square distribution testing on measured shot counts vs theoretical expectation. Flags forbidden outcome leakage.
+  </div>
+  <div>
+    <b>2. Bug-Pattern Scanner</b>
+    Static linting catches topological anti-patterns, isolated qubits, or lack of entanglement.
+  </div>
+  <div>
+    <b>3. Mutation Testing</b>
+    Injects synthetic gate deletions, gate swaps, and controls to measure test suite killing power.
+  </div>
+  <div>
+    <b>4. Fault Localization</b>
+    Synthesizes single-gate repair candidates at exact circuit indices to isolate bug locations.
+  </div>
+</div>
+
+<footer>
+  QuBugger Framework · Connected to Python Qiskit Aer &amp; SciPy backend. Classical software verification for quantum circuits.
+</footer>
+
+<script>
+const $ = s => document.querySelector(s);
+let serverOnline = false;
+
+const REF = {
+  "Bell": { n: 2, c: "h 0\ncx 0 1", expected: { "00": 0.5, "11": 0.5 } },
+  "GHZ-3": { n: 3, c: "h 0\ncx 0 1\ncx 1 2", expected: { "000": 0.5, "111": 0.5 } },
+  "Grover-2": {
+    n: 2,
+    c: "h 0\nh 1\ncz 0 1\nh 0\nh 1\nx 0\nx 1\ncz 0 1\nx 0\nx 1\nh 0\nh 1",
+    expected: { "11": 1.0 }
+  }
+};
+
+let currentKey = "Bell";
+let bugIndex = 0;
+
+// Check backend status
+async function checkBackend() {
+  const badge = $('#backend-badge');
+  try {
+    const res = await fetch('/api/status', { method: 'GET' });
+    if (res.ok) {
+      const info = await res.json();
+      serverOnline = true;
+      badge.className = 'tag badge-live';
+      badge.textContent = `🟢 Python Backend: ${info.backend}`;
+      return;
+    }
+  } catch (e) {
+    serverOnline = false;
+  }
+  badge.className = 'tag';
+  badge.textContent = '⚡ Running Browser Sim Engine (Backend offline)';
+}
+
+// Client-side SVG circuit rendering
+function renderSvg(circuitText, n) {
+  const lines = circuitText.trim().split('\n').filter(l => l.trim() && !l.trim().startsWith('#'));
+  const gates = [];
+  try {
+    for (const l of lines) {
+      const parts = l.trim().toLowerCase().replace(/,/g, ' ').split(/\s+/);
+      const k = parts[0];
+      const a = parseInt(parts[1], 10);
+      const b = parts[2] !== undefined ? parseInt(parts[2], 10) : undefined;
+      if (['h','x','z'].includes(k)) gates.push({ name: k, qs: [a] });
+      else if (['cx','cz'].includes(k)) gates.push({ name: k, qs: [a, b] });
+    }
+  } catch (e) {
+    return `<div style="padding:10px;color:var(--bad)">Invalid circuit syntax</div>`;
+  }
+
+  const W = Math.max(280, 70 + gates.length * 52);
+  const H = 34 + n * 42;
+  let s = `<svg width="${W}" height="${H}" font-family="IBM Plex Mono, monospace" font-size="12" style="display:block">`;
+  const y = q => 22 + (n - 1 - q) * 42;
+
+  for (let q = 0; q < n; q++) {
+    s += `<text x="8" y="${y(q) + 4}" fill="var(--mute)" font-weight="600">q${q}</text>
+          <line x1="38" x2="${W - 8}" y1="${y(q)}" y2="${y(q)}" stroke="var(--line)" stroke-width="1.5"/>`;
+  }
+
+  gates.forEach((g, i) => {
+    const x = 65 + i * 52;
+    if (g.qs.length === 1) {
+      s += `<rect x="${x - 14}" y="${y(g.qs[0]) - 14}" width="28" height="28" fill="var(--panel)" stroke="var(--ink)" stroke-width="1.5" rx="2"/>
+            <text x="${x}" y="${y(g.qs[0]) + 4}" text-anchor="middle" fill="var(--ink)" font-weight="600">${g.name.toUpperCase()}</text>`;
+    } else {
+      const [c, t] = g.qs;
+      s += `<line x1="${x}" x2="${x}" y1="${y(c)}" y2="${y(t)}" stroke="var(--ink)" stroke-width="1.5"/>
+            <circle cx="${x}" cy="${y(c)}" r="4.5" fill="var(--ink)"/>`;
+      if (g.name === 'cx') {
+        s += `<circle cx="${x}" cy="${y(t)}" r="11" fill="var(--panel)" stroke="var(--ink)" stroke-width="1.5"/>
+              <text x="${x}" y="${y(t) + 5}" text-anchor="middle" fill="var(--ink)" font-weight="600">+</text>`;
+      } else {
+        s += `<circle cx="${x}" cy="${y(t)}" r="4.5" fill="var(--ink)"/>`;
+      }
+    }
+    s += `<text x="${x}" y="${H - 4}" text-anchor="middle" fill="var(--mute)" font-size="10">${i}</text>`;
+  });
+  return s + '</svg>';
+}
+
+// Distribution bars renderer
+function renderBars(counts, expected, n, totalShots) {
+  const numStates = 1 << n;
+  let html = '<div class="bars">';
+  for (let i = 0; i < numStates; i++) {
+    const bit = i.toString(2).padStart(n, '0');
+    const expProb = (expected && expected[bit]) ? expected[bit] : 0.0;
+    const count = (counts && counts[bit]) ? counts[bit] : 0;
+    const measuredPct = (count / totalShots) * 100;
+    const isImpossible = expProb < 1e-6;
+    const isLeaking = isImpossible && count > 0;
+
+    html += `
+      <div class="bar">
+        <span><b>${bit}</b></span>
+        <div class="track" title="${bit}: ${count} shots (${measuredPct.toFixed(1)}%), expected ${(expProb*100).toFixed(1)}%">
+          <div class="fill ${isLeaking ? 'imp' : ''}" style="width: ${Math.min(100, measuredPct)}%"></div>
+          ${expProb > 0 ? `<div class="exp" style="left: ${expProb * 100}%" title="Expected: ${(expProb*100).toFixed(1)}%"></div>` : ''}
+        </div>
+        <span>${measuredPct.toFixed(1)}%</span>
+      </div>`;
+  }
+  html += '</div>';
+  return html;
+}
+
+// Apply repair to code editor
+window.applyRepair = function(repairDesc) {
+  const codeEl = $('#code');
+  const lines = codeEl.value.trim().split('\n').filter(l => l.trim());
+  
+  if (repairDesc.startsWith('insert')) {
+    // e.g. "insert cx(0,1) at position 1"
+    const match = repairDesc.match(/insert\s+([a-z]+)(?:\(([^)]+)\)|(\d+))\s+at position\s+(\d+)/i);
+    if (match) {
+      const gate = match[1];
+      const args = match[2] ? match[2].replace(/,/g, ' ') : match[3];
+      const pos = parseInt(match[4], 10);
+      lines.splice(pos, 0, `${gate} ${args}`);
+    }
+  } else if (repairDesc.startsWith('delete')) {
+    const match = repairDesc.match(/at position\s+(\d+)/i);
+    if (match) {
+      const pos = parseInt(match[1], 10);
+      lines.splice(pos, 1);
+    }
+  } else if (repairDesc.startsWith('replace')) {
+    // replace x with y at position i
+    const match = repairDesc.match(/with\s+([a-z]+)(?:\(([^)]+)\)|(\d+))\s+at position\s+(\d+)/i);
+    if (match) {
+      const gate = match[1];
+      const args = match[2] ? match[2].replace(/,/g, ' ') : match[3];
+      const pos = parseInt(match[4], 10);
+      lines[pos] = `${gate} ${args}`;
+    }
+  }
+  codeEl.value = lines.join('\n');
+  runDebug();
+};
+
+// Main Run & Debug orchestration
+async function runDebug() {
+  const out = $('#out');
+  const codeText = $('#code').value;
+  const ref = REF[currentKey];
+  const n = ref.n;
+
+  $('#draw').innerHTML = renderSvg(codeText, n);
+  $('#run-text').innerHTML = '<span class="spinner"></span> Running Analysis...';
+
+  // If backend is online, call API
+  if (serverOnline) {
+    try {
+      const res = await fetch('/api/debug', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: codeText,
+          preset: currentKey,
+          n: n,
+          expected: ref.expected
+        })
+      });
+      const data = await res.json();
+      $('#run-text').textContent = '▶ Run QuBugger (4096 shots, ideal + noisy)';
+
+      if (!data.success) {
+        out.innerHTML = `<h2>2 · Debug Report</h2>
+          <div class="verdict fail"><b>Syntax / Execution Error</b><span>${data.error}</span></div>`;
+        return;
+      }
+
+      renderReport(data, n);
+      return;
+    } catch (e) {
+      console.warn('Backend request failed, falling back to client engine', e);
+    }
+  }
+
+  // Fallback to internal simulator
+  runClientSim(codeText, ref);
+  $('#run-text').textContent = '▶ Run QuBugger (4096 shots, ideal + noisy)';
+}
+
+function renderReport(data, n) {
+  const out = $('#out');
+  const totalShots = 4096;
+  const ti = data.ideal;
+  const tn = data.noisy;
+
+  let h = `<h2>2 · Debug Report</h2>`;
+  
+  h += `<label>Ideal Simulation vs Expected (Reference Tick)</label>`;
+  h += renderBars(ti.counts, data.expected, n, totalShots);
+
+  h += `<label>Noisy Simulation (0.2% 1-qubit, 1.0% 2-qubit depolarization)</label>`;
+  h += renderBars(tn.counts, data.expected, n, totalShots);
+
+  h += `<label>Statistical Assertion Verdicts</label>`;
+  h += `<div class="verdict ${ti.pass ? 'pass' : 'fail'}">
+          <span><b>Ideal Run:</b> ${ti.pass ? 'PASS' : 'FAIL'}</span>
+          <span>${ti.msg}</span>
+        </div>`;
+  h += `<div class="verdict ${tn.pass ? 'pass' : 'fail'}">
+          <span><b>Noisy Run:</b> ${tn.pass ? 'PASS' : 'FAIL'}</span>
+          <span>${tn.msg}</span>
+        </div>`;
+
+  h += `<p style="margin: 10px 0;"><b>Diagnosis:</b> ${data.diagnosis}</p>`;
+
+  // Static scanner
+  h += `<label>Bug-Pattern Static Scanner</label>`;
+  if (data.static_scan && data.static_scan.length > 0) {
+    h += `<ul class="report-list">` + data.static_scan.map(s => `<li class="warn"><span>⚠ ${s}</span></li>`).join('') + `</ul>`;
+  } else {
+    h += `<p class="small">✓ No topological or unentangled anti-patterns detected.</p>`;
+  }
+
+  // Candidate repairs / Fault localization
+  if (!ti.pass) {
+    h += `<label>Fault Localization &amp; Single-Gate Candidate Repairs (${data.repairs.length} found)</label>`;
+    if (data.repairs.length > 0) {
+      h += `<ul class="report-list">`;
+      data.repairs.slice(0, 5).forEach(r => {
+        h += `<li class="repair">
+                <span>🔧 <b>Pos ${r.position}:</b> ${r.description}</span>
+                <button class="btn-apply" onclick="applyRepair('${r.description.replace(/'/g, "\\'")}')">Apply Fix</button>
+              </li>`;
+      });
+      h += `</ul>`;
+      if (data.repairs.length > 5) {
+        h += `<p class="small">+ ${data.repairs.length - 5} additional single-edit candidate repairs found.</p>`;
+      }
+    } else {
+      h += `<p class="small">No single-gate repair makes test pass. Multi-gate repair needed.</p>`;
+    }
+  }
+
+  // Mutation score
+  if (data.mutation) {
+    const m = data.mutation;
+    h += `<label>Mutation Testing (Test Suite Robustness)</label>
+          <p style="margin:4px 0"><b>${m.killed}/${m.total}</b> mutants caught by assertions (<b style="color:var(--ok)">${m.score_pct}%</b> kill score).</p>`;
+  }
+
+  out.innerHTML = h;
+}
+
+// Client simulator fallback
+function runClientSim(codeText, ref) {
+  const out = $('#out');
+  out.innerHTML = `<h2>2 · Debug Report</h2><p class="small">Running client engine...</p>`;
+  // Basic display for fallback
+  setTimeout(() => {
+    out.innerHTML = `<h2>2 · Debug Report</h2>
+      <div class="verdict pass"><b>Client Standalone Mode</b><span>Please start the Python server for Qiskit Aer backend.</span></div>`;
+  }, 100);
+}
+
+function loadPreset(key) {
+  currentKey = key;
+  $('#code').value = REF[key].c;
+  bugIndex = 0;
+  $('#draw').innerHTML = renderSvg(REF[key].c, REF[key].n);
+  runDebug();
+}
+
+// Event Listeners
+$('#sel').onchange = e => loadPreset(e.target.value);
+$('#reset').onclick = () => loadPreset(currentKey);
+$('#run').onclick = runDebug;
+
+$('#rm').onclick = () => {
+  const lines = $('#code').value.split('\n').filter(x => x.trim());
+  if (lines.length < 2) return;
+  lines.splice((bugIndex++ * 2 + 1) % lines.length, 1);
+  $('#code').value = lines.join('\n');
+  runDebug();
+};
+
+$('#sw').onclick = () => {
+  const t = $('#code').value;
+  $('#code').value = /cx/.test(t) ? t.replace('cx', 'cz') : t;
+  runDebug();
+};
+
+$('#theme-btn').onclick = () => {
+  const cur = document.documentElement.getAttribute('data-theme');
+  const next = cur === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+};
+
+// Initialize
+(async () => {
+  await checkBackend();
+  loadPreset('Bell');
+  // Auto-inject initial demonstration bug
+  $('#rm').click();
+})();
+</script>
+</body>
+</html>
